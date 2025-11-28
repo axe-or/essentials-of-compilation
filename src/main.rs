@@ -4,12 +4,15 @@ pub struct Lexer {
     current: usize,
 }
 
+#[derive(Debug)]
 pub enum Token {
     Identifier(String),
     Integer(i64),
     Real(f64),
     Plus,
     Minus,
+
+    EndOfFile,
 }
 
 fn is_part_of_identifier(c: char) -> bool {
@@ -19,6 +22,11 @@ fn is_part_of_identifier(c: char) -> bool {
     }
 }
 
+#[derive(Debug)]
+pub enum Error {
+    UnknownCodepoint,
+    UnterminatedString,
+}
 
 impl Lexer {
     pub fn new(source: &str) -> Lexer {
@@ -57,13 +65,13 @@ impl Lexer {
         }
     }
 
-    fn scan_identifier(&mut self) -> Option<Token> {
+    fn scan_identifier(&mut self) -> Token {
         let start = self.current;
 
         loop {
             let c = match self.advance(){
                 Some(c) => c,
-                None => break,
+                None => return Token::EndOfFile,
             };
 
             if !is_part_of_identifier(c){
@@ -72,18 +80,31 @@ impl Lexer {
             }
         }
 
-        if start == self.current {
-            return None;
-        }
+        assert!(self.current > start, "Invalid identifier length");
 
         let lexeme: String = (&self.source[start..self.current]).iter().collect();
-        println!("'{}'", lexeme);
 
-        return Some(Token::Identifier(lexeme));
+        return Token::Identifier(lexeme);
     }
 
     fn scan_integer(&mut self) -> Option<Token>{
         todo!();
+    }
+
+    pub fn next(&mut self) -> Result<Token, Error> {
+        self.skip_whitespace();
+
+        let c = match self.peek() {
+            Some(c) => c,
+            None => return Ok(Token::EndOfFile),
+        };
+
+        if is_part_of_identifier(c){
+            return Ok(self.scan_identifier());
+
+        }
+
+        return Err(Error::UnknownCodepoint);
     }
 }
 
@@ -94,8 +115,16 @@ fn main() {
 
     let mut lex = Lexer::new(source);
 
-    lex.skip_whitespace();
-    lex.scan_identifier();
+    loop {
+        let tk = match lex.next() {
+            Ok(tk) => tk,
+            Err(e) => {
+                println!("{:?}", e);
+                break;
+            },
+        };
 
-    println!("Hello, world!");
+        println!("{:?}", tk);
+    }
+
 }
