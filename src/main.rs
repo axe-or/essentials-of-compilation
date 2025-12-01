@@ -1,16 +1,32 @@
-
 pub struct Lexer {
     source: Vec<char>,
     current: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Token {
     Identifier(String),
     Integer(i64),
     Real(f64),
+
     Plus,
     Minus,
+    Star,
+    Slash,
+    Modulo,
+
+    Assign,
+    Equal,
+    NotEqual,
+    Gt,
+    GtEq,
+    Lt,
+    LtEq,
+
+    Fn,
+    If,
+    Else,
+    Let,
 
     EndOfFile,
 }
@@ -34,6 +50,10 @@ impl Lexer {
             source: source.chars().collect(),
             current: 0,
         }
+    }
+
+    pub fn make_lexeme(&self, start: usize, end: usize) -> String {
+        (&self.source[start..end]).iter().collect()
     }
 
     pub fn advance(&mut self) -> Option<char> {
@@ -71,7 +91,7 @@ impl Lexer {
         loop {
             let c = match self.advance(){
                 Some(c) => c,
-                None => return Token::EndOfFile,
+                None => break,
             };
 
             if !is_part_of_identifier(c){
@@ -82,16 +102,51 @@ impl Lexer {
 
         assert!(self.current > start, "Invalid identifier length");
 
-        let lexeme: String = (&self.source[start..self.current]).iter().collect();
+        let lexeme: String = self.make_lexeme(start, self.current);
+        if let Some(tok) = as_keyword(&lexeme){
+            return tok;
+        }
 
         return Token::Identifier(lexeme);
     }
 
-    fn scan_integer(&mut self) -> Option<Token>{
-        todo!();
+    // fn scan_integer(&mut self){}
+
+    fn scan_decimal_integer(&mut self) -> Result<Token, Error>{
+        let start = self.current;
+
+        loop {
+            let c = match self.advance(){
+                Some(c) => c,
+                None => break,
+            };
+
+            if !c.is_numeric() && c != '_' {
+                self.current -= 1;
+                break;
+            }
+        }
+
+        let lexeme = self.make_lexeme(start, self.current);
+        println!("'{}'", lexeme);
+        let num = lexeme.parse::<i64>().expect("Invalid integer");
+
+        return Ok(Token::Integer(num));
+    }
+
+    fn match_advance(&mut self, target: char) -> bool {
+        if let Some(c) = self.peek() {
+            if c == target {
+                self.current += 1;
+            }
+            return c == target;
+        }
+        return false;
     }
 
     pub fn next(&mut self) -> Result<Token, Error> {
+        use Token as T;
+
         self.skip_whitespace();
 
         let c = match self.peek() {
@@ -99,30 +154,82 @@ impl Lexer {
             None => return Ok(Token::EndOfFile),
         };
 
-        if is_part_of_identifier(c){
-            return Ok(self.scan_identifier());
-
+        if c.is_numeric(){
+            return self.scan_decimal_integer();
         }
 
-        return Err(Error::UnknownCodepoint);
+        if is_part_of_identifier(c){
+            return Ok(self.scan_identifier());
+        }
+
+        let tk = match c {
+            '+' => Ok(T::Plus),
+            '-' => Ok(T::Minus),
+            '*' => Ok(T::Minus),
+            '/' => Ok(T::Slash),
+            '%' => Ok(T::Modulo),
+            '=' => if self.match_advance('='){
+                Ok(T::Equal)
+            } else {
+                Ok(T::Assign)
+            }
+            '>' => if self.match_advance('='){
+                Ok(T::GtEq)
+            } else {
+                Ok(T::Gt)
+            },
+            '<' => if self.match_advance('='){
+                Ok(T::LtEq)
+            } else {
+                Ok(T::Lt)
+            },
+
+            _ => Err(Error::UnknownCodepoint),
+        };
+
+        return tk;
     }
+}
+
+fn as_keyword(s: &str) -> Option<Token> {
+    use Token as T;
+
+    static KEYWORDS: [(&'static str, Token); 4] = [
+        ("if", T::If),
+        ("else", T::Else),
+        ("let", T::Let),
+        ("fn", T::Fn),
+    ];
+
+    for (key, token) in &KEYWORDS {
+        if s == *key {
+            return Some(token.clone());
+        }
+    }
+
+    return None;
 }
 
 fn main() {
     let source = r"
-    let x = 69
-    ";
+    let x = 69;
+    ".trim();
 
     let mut lex = Lexer::new(source);
+    println!("{}", source.trim());
 
     loop {
         let tk = match lex.next() {
             Ok(tk) => tk,
             Err(e) => {
-                println!("{:?}", e);
+                println!("[{}] Error {:?}", lex.current, e);
                 break;
             },
         };
+
+        if tk == Token::EndOfFile {
+            break;
+        }
 
         println!("{:?}", tk);
     }
