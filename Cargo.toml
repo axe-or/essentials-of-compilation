@@ -7,4 +7,4 @@ edition = "2021"
 allocator-api2 = { version = "0.3.1", default-features = false }
 
 [patch.crates-io]
-allocator-api2 = { path = "./vendor/allocator-api2" }
+allocator-api2 = { path = "./lib/allocator-api2" }

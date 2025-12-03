@@ -6,6 +6,7 @@ pub struct Lexer {
 #[derive(Clone, PartialEq, Debug)]
 pub enum Token {
     Identifier(String),
+    String(String),
     Integer(i64),
     Real(f64),
 
@@ -53,6 +54,8 @@ fn is_part_of_identifier(c: char) -> bool {
 pub enum Error {
     UnknownCodepoint,
     UnterminatedString,
+    InvalidEscapeSequence,
+    InvalidMultiLineString,
 }
 
 fn escape_sequence(c: char) -> Option<char> {
@@ -135,7 +138,43 @@ impl Lexer {
     }
 
     fn scan_string(&mut self) -> Result<Token, Error> {
-        todo!();
+        assert!(self.advance() == Some('"'), "Invalid lexer position");
+
+        let mut buf = String::new();
+
+        loop {
+            let c = match self.advance() {
+                Some(c) => c,
+                None => return Err(Error::UnterminatedString),
+            };
+
+            if c == '\\' {
+                let next_char = match self.advance() {
+                    Some(c) => c,
+                    None => return Err(Error::UnterminatedString),
+                };
+
+                let escaped = match escape_sequence(next_char) {
+                    Some(c) => c,
+                    None => return Err(Error::InvalidEscapeSequence),
+                };
+
+                buf.push(escaped);
+            }
+            else if c == '\n' || c == '\r' {
+                return Err(Error::InvalidMultiLineString);
+            }
+            else if c == '"' {
+                break;
+            }
+            else {
+                buf.push(c);
+            }
+
+        }
+
+        let tk = Token::String(buf);
+        return Ok(tk);
     }
 
     fn scan_decimal_integer(&mut self) -> Result<Token, Error>{
@@ -188,6 +227,10 @@ impl Lexer {
             return Ok(self.scan_identifier());
         }
 
+        if c == '"' {
+            return self.scan_string();
+        }
+
         _ = self.advance();
 
         let tk = match c {
@@ -229,7 +272,6 @@ impl Lexer {
             _ => Err(Error::UnknownCodepoint),
         };
 
-
         return tk;
     }
 }
@@ -254,16 +296,18 @@ fn as_keyword(s: &str) -> Option<Token> {
 }
 
 fn main() {
-    let source = r"
-    let x = 69; <<>>
-    ".trim();
+    let source = r#"
+    let x = 69; <<>>;
+    let name = "Hello\n\t\"World!\"";
+    "#.trim();
+
 
     let mut lex = Lexer::new(source);
     println!("{}", source.trim());
 
     loop {
         let tk = match lex.next() {
-            Ok(tk) => tk,
+            Ok(v) => v,
             Err(e) => {
                 println!("[{}] Error {:?}", lex.current, e);
                 break;
@@ -276,5 +320,5 @@ fn main() {
 
         println!("{:?}", tk);
     }
-
 }
+
