@@ -15,13 +15,24 @@ pub enum Token {
     Slash,
     Modulo,
 
-    Assign,
+    ShiftRight,
+    ShiftLeft,
+    Tilde,
+    And,
+    Or,
+
     Equal,
     NotEqual,
     Gt,
     GtEq,
     Lt,
     LtEq,
+
+    Assign,
+    Dot,
+    Semicolon,
+    Colon,
+    Comma,
 
     Fn,
     If,
@@ -162,30 +173,47 @@ impl Lexer {
             return Ok(self.scan_identifier());
         }
 
+        _ = self.advance();
+
         let tk = match c {
+            '.' => Ok(T::Dot),
+            ':' => Ok(T::Colon),
+            ',' => Ok(T::Comma),
+            ';' => Ok(T::Semicolon),
+
             '+' => Ok(T::Plus),
             '-' => Ok(T::Minus),
             '*' => Ok(T::Minus),
             '/' => Ok(T::Slash),
             '%' => Ok(T::Modulo),
+            '~' => Ok(T::Tilde),
+            '|' => Ok(T::Or),
+            '&' => Ok(T::And),
             '=' => if self.match_advance('='){
                 Ok(T::Equal)
             } else {
                 Ok(T::Assign)
             }
+
             '>' => if self.match_advance('='){
                 Ok(T::GtEq)
+            } else if self.match_advance('>') {
+                Ok(T::ShiftRight)
             } else {
                 Ok(T::Gt)
             },
+
             '<' => if self.match_advance('='){
                 Ok(T::LtEq)
+            } else if self.match_advance('<') {
+                Ok(T::ShiftLeft)
             } else {
                 Ok(T::Lt)
             },
 
             _ => Err(Error::UnknownCodepoint),
         };
+
 
         return tk;
     }
@@ -212,7 +240,7 @@ fn as_keyword(s: &str) -> Option<Token> {
 
 fn main() {
     let source = r"
-    let x = 69;
+    let x = 69; <<>>
     ".trim();
 
     let mut lex = Lexer::new(source);
