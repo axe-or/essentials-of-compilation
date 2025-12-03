@@ -55,6 +55,19 @@ pub enum Error {
     UnterminatedString,
 }
 
+fn escape_sequence(c: char) -> Option<char> {
+    match c {
+        'r' => Some('\r'),
+        'n' => Some('\n'),
+        't' => Some('\t'),
+        'e' => Some('\x1B'),
+        '"' => Some('"'),
+        '\'' => Some('\''),
+        '\\' => Some('\\'),
+        _ => None,
+    }
+}
+
 impl Lexer {
     pub fn new(source: &str) -> Lexer {
         Lexer {
@@ -121,7 +134,9 @@ impl Lexer {
         return Token::Identifier(lexeme);
     }
 
-    // fn scan_integer(&mut self){}
+    fn scan_string(&mut self) -> Result<Token, Error> {
+        todo!();
+    }
 
     fn scan_decimal_integer(&mut self) -> Result<Token, Error>{
         let start = self.current;
