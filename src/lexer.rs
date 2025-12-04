@@ -11,6 +11,15 @@ pub struct Token {
     pub offset: usize,
 }
 
+impl Token {
+    pub fn new(kind: TokenKind, offset: usize) -> Token {
+        Token {
+            kind: kind,
+            offset: offset,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum TokenKind {
     Identifier(String),
@@ -77,13 +86,6 @@ impl Lexer {
         (&self.source[start..end]).iter().collect()
     }
 
-    fn make_token(&self, kind: TokenKind) -> Token {
-        Token {
-            kind: kind,
-            offset: self.current,
-        }
-    }
-
     fn advance(&mut self) -> Option<char> {
         if self.current >= self.source.len(){
             return None;
@@ -136,13 +138,14 @@ impl Lexer {
             None => TokenKind::Identifier(lexeme),
         };
 
-        return self.make_token(kind);
+        return Token { kind, offset: start };
     }
 
     fn scan_string(&mut self) -> Result<Token, Error> {
         assert!(self.advance() == Some('"'), "Invalid lexer position");
 
         let mut buf = String::new();
+        let offset = self.current;
 
         loop {
             let c = match self.advance() {
@@ -175,11 +178,11 @@ impl Lexer {
         }
 
         let kind = TokenKind::String(buf);
-        return Ok(self.make_token(kind));
+        return Ok(Token::new(kind, offset));
     }
 
     fn scan_decimal_integer(&mut self) -> Result<Token, Error>{
-        let start = self.current;
+        let offset = self.current;
 
         loop {
             let c = match self.advance(){
@@ -193,11 +196,11 @@ impl Lexer {
             }
         }
 
-        let lexeme = self.make_lexeme(start, self.current);
+        let lexeme = self.make_lexeme(offset, self.current);
         let num = lexeme.parse::<i64>().expect("Invalid integer");
         let kind = TokenKind::Integer(num);
 
-        return Ok(self.make_token(kind));
+        return Ok(Token::new(kind, offset));
     }
 
     fn match_advance(&mut self, target: char) -> bool {
@@ -222,9 +225,11 @@ impl Lexer {
 
         self.skip_whitespace();
 
+        let offset = self.current;
+
         let c = match self.peek() {
             Some(c) => c,
-            None => return Ok(self.make_token(T::EndOfFile)),
+            None => return Ok(Token::new(T::EndOfFile, offset)),
         };
 
         if c.is_numeric(){
@@ -292,7 +297,7 @@ impl Lexer {
             _ => Err(Error::UnknownCodepoint),
         }?;
 
-        return Ok(self.make_token(kind));
+        return Ok(Token::new(kind, offset));
     }
 }
 
