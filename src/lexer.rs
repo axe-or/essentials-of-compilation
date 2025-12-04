@@ -1,16 +1,22 @@
 use crate::Error;
 
 pub struct Lexer {
-     source: Vec<char>,
-    pub(crate)current: usize,
+    pub source: Vec<char>,
+    pub current: usize,
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Token {
+pub struct Token {
+    pub kind: TokenKind,
+    pub offset: usize,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TokenKind {
     Identifier(String),
     String(String),
     Integer(i64),
-    Real(f64),
+    Constant,
 
     Plus,
     Minus,
@@ -37,6 +43,13 @@ pub enum Token {
     Colon,
     Comma,
 
+    ParenOpen,
+    ParenClose,
+    SquareOpen,
+    SquareClose,
+    CurlyOpen,
+    CurlyClose,
+
     Fn,
     If,
     Else,
@@ -60,11 +73,18 @@ impl Lexer {
         }
     }
 
-    pub fn make_lexeme(&self, start: usize, end: usize) -> String {
+    fn make_lexeme(&self, start: usize, end: usize) -> String {
         (&self.source[start..end]).iter().collect()
     }
 
-    pub fn advance(&mut self) -> Option<char> {
+    fn make_token(&self, kind: TokenKind) -> Token {
+        Token {
+            kind: kind,
+            offset: self.current,
+        }
+    }
+
+    fn advance(&mut self) -> Option<char> {
         if self.current >= self.source.len(){
             return None;
         }
@@ -72,7 +92,7 @@ impl Lexer {
         return Some(self.source[self.current - 1]);
     }
 
-    pub fn peek(&self) -> Option<char> {
+    fn peek(&self) -> Option<char> {
         if self.current >= self.source.len(){
             return None;
         }
@@ -111,11 +131,12 @@ impl Lexer {
         assert!(self.current > start, "Invalid identifier length");
 
         let lexeme: String = self.make_lexeme(start, self.current);
-        if let Some(tok) = as_keyword(&lexeme){
-            return tok;
-        }
+        let kind = match as_keyword(&lexeme){
+            Some(kw) => kw,
+            None => TokenKind::Identifier(lexeme),
+        };
 
-        return Token::Identifier(lexeme);
+        return self.make_token(kind);
     }
 
     fn scan_string(&mut self) -> Result<Token, Error> {
@@ -151,11 +172,10 @@ impl Lexer {
             else {
                 buf.push(c);
             }
-
         }
 
-        let tk = Token::String(buf);
-        return Ok(tk);
+        let kind = TokenKind::String(buf);
+        return Ok(self.make_token(kind));
     }
 
     fn scan_decimal_integer(&mut self) -> Result<Token, Error>{
@@ -174,10 +194,10 @@ impl Lexer {
         }
 
         let lexeme = self.make_lexeme(start, self.current);
-        println!("'{}'", lexeme);
         let num = lexeme.parse::<i64>().expect("Invalid integer");
+        let kind = TokenKind::Integer(num);
 
-        return Ok(Token::Integer(num));
+        return Ok(self.make_token(kind));
     }
 
     fn match_advance(&mut self, target: char) -> bool {
@@ -190,14 +210,21 @@ impl Lexer {
         return false;
     }
 
+    pub fn get_token(&mut self) -> Result<Token, Error> {
+        let restore = self.current;
+        let res = self.next();
+        self.current = restore;
+        return res;
+    }
+
     pub fn next(&mut self) -> Result<Token, Error> {
-        use Token as T;
+        use TokenKind as T;
 
         self.skip_whitespace();
 
         let c = match self.peek() {
             Some(c) => c,
-            None => return Ok(Token::EndOfFile),
+            None => return Ok(self.make_token(T::EndOfFile)),
         };
 
         if c.is_numeric(){
@@ -214,19 +241,31 @@ impl Lexer {
 
         _ = self.advance();
 
-        let tk = match c {
+        let kind = match c {
             '.' => Ok(T::Dot),
             ':' => Ok(T::Colon),
             ',' => Ok(T::Comma),
             ';' => Ok(T::Semicolon),
 
+            '(' => Ok(T::ParenOpen),
+            ')' => Ok(T::ParenClose),
+            '[' => Ok(T::SquareOpen),
+            ']' => Ok(T::SquareClose),
+            '{' => Ok(T::CurlyOpen),
+            '}' => Ok(T::CurlyClose),
+
             '+' => Ok(T::Plus),
             '-' => Ok(T::Minus),
-            '*' => Ok(T::Minus),
+            '*' => Ok(T::Star),
             '/' => Ok(T::Slash),
             '%' => Ok(T::Modulo),
             '~' => Ok(T::Tilde),
             '|' => Ok(T::Or),
+            '!' => if self.match_advance('='){
+                Ok(T::NotEqual)
+            } else {
+                Err(Error::InvalidOperator)
+            }
             '&' => Ok(T::And),
             '=' => if self.match_advance('='){
                 Ok(T::Equal)
@@ -251,16 +290,16 @@ impl Lexer {
             },
 
             _ => Err(Error::UnknownCodepoint),
-        };
+        }?;
 
-        return tk;
+        return Ok(self.make_token(kind));
     }
 }
 
-fn as_keyword(s: &str) -> Option<Token> {
-    use Token as T;
+fn as_keyword(s: &str) -> Option<TokenKind> {
+    use TokenKind as T;
 
-    static KEYWORDS: [(&'static str, Token); 4] = [
+    static KEYWORDS: [(&'static str, TokenKind); 4] = [
         ("if", T::If),
         ("else", T::Else),
         ("let", T::Let),
