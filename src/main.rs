@@ -1,6 +1,14 @@
 mod lexer;
 
 use lexer::{Lexer, Token, TokenKind};
+use std::num::NonZeroU32;
+use std::mem::size_of;
+
+macro_rules! const_assert {
+    ($x:expr, $msg:expr) => {
+        const _: () = ::core::assert!($x, $msg);
+    };
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -10,6 +18,28 @@ pub enum Error {
     InvalidOperator,
     InvalidMultiLineString,
 }
+
+#[derive(Copy, Clone)]
+struct NodeId {
+    pub gen: NonZeroU32,
+    pub offset: u32,
+}
+
+const_assert!(size_of::<NodeId>() == 8, "Unexpected layout for NodeId");
+
+// pub struct AstScope {}
+
+// pub enum AstExprType {
+// }
+
+// pub enum AstNode {
+//     Expr(AstExpr),
+//     Scope(AstScope),
+// }
+
+// pub struct Ast {
+//     nodes: Vec<AstNode>,
+// }
 
 pub struct Parser {
     lexer: Lexer,
@@ -71,5 +101,7 @@ fn main() {
 
         println!("{:?}", tk);
     }
+
+    println!("Reg: {}, Opt: {}", size_of::<NodeId>(), size_of::<Option<NodeId>>());
 }
 

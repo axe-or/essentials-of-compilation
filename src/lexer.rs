@@ -266,12 +266,13 @@ impl Lexer {
             '%' => Ok(T::Modulo),
             '~' => Ok(T::Tilde),
             '|' => Ok(T::Or),
+            '&' => Ok(T::And),
+
             '!' => if self.match_advance('='){
                 Ok(T::NotEqual)
             } else {
                 Err(Error::InvalidOperator)
             }
-            '&' => Ok(T::And),
             '=' => if self.match_advance('='){
                 Ok(T::Equal)
             } else {
