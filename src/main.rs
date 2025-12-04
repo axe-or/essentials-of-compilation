@@ -25,12 +25,43 @@ struct NodeId {
     pub offset: u32,
 }
 
+struct PrimaryExpr {
+    value: Token,
+}
+
+struct UnaryExpr {
+    operator: TokenKind,
+    operand: NodeId,
+}
+
+struct BinaryExpr {
+    operator: TokenKind,
+    left: NodeId,
+    right: NodeId,
+}
+
+enum Node {
+    Primary(PrimaryExpr),
+    Unary(UnaryExpr),
+    Binary(BinaryExpr),
+    // Block()
+}
+
+impl Node {
+    pub fn is_expression(&self) -> bool {
+        use Node as T;
+
+        match &self {
+            | T::Primary(_)
+            | T::Unary(_)
+            | T::Binary(_) => true,
+
+            _ => false,
+        }
+    }
+}
+
 const_assert!(size_of::<NodeId>() == 8, "Unexpected layout for NodeId");
-
-// pub struct AstScope {}
-
-// pub enum AstExprType {
-// }
 
 // pub enum AstNode {
 //     Expr(AstExpr),
